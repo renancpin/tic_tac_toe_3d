@@ -1,25 +1,27 @@
 package game.exceptions;
 
+import java.util.HashMap;
+import java.util.Map;
+
 import game.Move;
 
 public class InvalidMoveException extends Exception {
     private String move;
     private String motive;
 
+    private static Map<InvalidMoveExceptionMotive, String> MOTIVES;
+
+    static {
+        MOTIVES = new HashMap<InvalidMoveExceptionMotive, String>();
+
+        MOTIVES.put(InvalidMoveExceptionMotive.OUT_OF_BOUNDS, "Move coordinates out of bounds");
+        MOTIVES.put(InvalidMoveExceptionMotive.NON_EMPTY, "Specified cell is already filled");
+        MOTIVES.put(InvalidMoveExceptionMotive.GAME_OVER, "The game is already over");
+        MOTIVES.put(InvalidMoveExceptionMotive.INVALID_TURN, "Player is not currently in their turn");
+    }
+
     public InvalidMoveException(InvalidMoveExceptionMotive motive, Move move) {
-        switch (motive) {
-            case OUT_OF_BOUNDS:
-                this.motive = "Move coordinates out of bounds";
-                break;
-            case NON_EMPTY:
-                this.motive = "Specified cell is already filled";
-                break;
-            case GAME_OVER:
-                this.motive = "The game is already over";
-                break;
-            default:
-                this.motive = "Unspecified error";
-        }
+        this.motive = MOTIVES.getOrDefault(motive, "Unspecified reason");
 
         this.move = move.toString();
     }
