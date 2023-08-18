@@ -7,10 +7,46 @@ public class Match {
 
     private int[][][] cells = new int[SIZE][SIZE][SIZE];
     private boolean isGameRunning = true;
+    private int currentPlayer = 1;
+
+    public int makeMove(Move move) {
+        try {
+            assertLegalMove(move);
+
+            final int board = move.getBoard();
+            final int line = move.getLine();
+            final int column = move.getColumn();
+            final int player = move.getPlayer();
+
+            this.cells[board][line][column] = player;
+
+            boolean isVictory = checkWinConditionStraightLines(move)
+                    || checkWinCondition2dDiagonals(move)
+                    || checkWinCondition3dDiagonals(move);
+
+            if (isVictory) {
+                endMatch();
+
+                return -1;
+            }
+
+            endTurn();
+        } catch (Exception e) {
+            System.out.println(e);
+        }
+
+        return this.currentPlayer;
+    }
 
     private void assertLegalMove(Move move) throws InvalidMoveException {
         if (!isGameRunning) {
             throw new InvalidMoveException(InvalidMoveExceptionMotive.GAME_OVER, move);
+        }
+
+        final int player = move.getPlayer();
+
+        if (player == 0 || player != this.currentPlayer) {
+            throw new InvalidMoveException(InvalidMoveExceptionMotive.INVALID_TURN, move);
         }
 
         final int board = move.getBoard();
@@ -28,6 +64,71 @@ public class Match {
         if (this.cells[board][line][column] != 0) {
             throw new InvalidMoveException(InvalidMoveExceptionMotive.NON_EMPTY, move);
         }
+    }
+
+    private boolean checkWinConditionStraightLines(Move move) {
+        final int player = move.getPlayer();
+
+        final int board = move.getBoard();
+        final int line = move.getLine();
+        final int column = move.getColumn();
+
+        boolean lineVictory = true;
+        boolean columnVictory = true;
+        boolean perpendicularVictory = true;
+
+        for (int i = 0; i < SIZE; i++) {
+            if (this.cells[i][line][column] != player) {
+                perpendicularVictory = false;
+            }
+
+            if (this.cells[board][i][column] != player) {
+                lineVictory = false;
+            }
+
+            if (this.cells[board][line][i] != player) {
+                columnVictory = false;
+            }
+        }
+
+        return (lineVictory || columnVictory || perpendicularVictory);
+    }
+
+    private boolean checkWinCondition2dDiagonals(Move move) {
+        final int board = move.getBoard();
+        final int line = move.getLine();
+        final int column = move.getColumn();
+        final int player = move.getPlayer();
+
+        final CellType cellType = getCellType(move);
+
+        final int lookForCoordinate = 1;
+        boolean isVictory = false;
+
+        if (cellType == CellType.EDGE) {
+            if (board == lookForCoordinate) {
+                isVictory = checkBoardPlane(board, player);
+            } else if (line == lookForCoordinate) {
+                isVictory = checkLinePlane(line, player);
+            } else if (column == lookForCoordinate) {
+                isVictory = checkColumnPlane(column, player);
+            }
+
+        } else if (cellType == CellType.FACE_CENTER) {
+            if (board != lookForCoordinate) {
+                isVictory = checkBoardPlane(board, player);
+            } else if (line != lookForCoordinate) {
+                isVictory = checkLinePlane(line, player);
+            } else if (column != lookForCoordinate) {
+                isVictory = checkColumnPlane(column, player);
+            }
+        } else if (cellType == CellType.VERTEX) {
+            isVictory = checkBoardPlane(board, player) ||
+                    checkLinePlane(line, player) ||
+                    checkColumnPlane(column, player);
+        }
+
+        return isVictory;
     }
 
     private boolean checkBoardPlane(int board, int player) {
@@ -81,71 +182,13 @@ public class Match {
         return (diagonal1Victory || diagonal2Victory);
     }
 
-    private boolean checkWinConditionStraightLines(Move move) {
-        final int player = move.getPlayer();
+    private boolean checkWinCondition3dDiagonals(Move move) {
+        final CellType cellType = getCellType(move);
 
-        final int board = move.getBoard();
-        final int line = move.getLine();
-        final int column = move.getColumn();
-
-        boolean lineVictory = true;
-        boolean columnVictory = true;
-        boolean perpendicularVictory = true;
-
-        for (int i = 0; i < SIZE; i++) {
-            if (this.cells[i][line][column] != player) {
-                perpendicularVictory = false;
-            }
-
-            if (this.cells[board][i][column] != player) {
-                lineVictory = false;
-            }
-
-            if (this.cells[board][line][i] != player) {
-                columnVictory = false;
-            }
+        if (cellType != CellType.CUBE_CENTER && cellType != CellType.VERTEX) {
+            return false;
         }
 
-        return (lineVictory || columnVictory || perpendicularVictory);
-    }
-
-    private boolean checkWinCondition2dDiagonals(Move move, CellType cellType) {
-        final int player = move.getPlayer();
-
-        final int board = move.getBoard();
-        final int line = move.getLine();
-        final int column = move.getColumn();
-
-        final int lookForCoordinate = 1;
-        boolean isVictory = false;
-
-        if (cellType == CellType.EDGE) {
-            if (board == lookForCoordinate) {
-                isVictory = checkBoardPlane(board, player);
-            } else if (line == lookForCoordinate) {
-                isVictory = checkLinePlane(line, player);
-            } else if (column == lookForCoordinate) {
-                isVictory = checkColumnPlane(column, player);
-            }
-
-        } else if (cellType == CellType.FACE_CENTER) {
-            if (board != lookForCoordinate) {
-                isVictory = checkBoardPlane(board, player);
-            } else if (line != lookForCoordinate) {
-                isVictory = checkLinePlane(line, player);
-            } else if (column != lookForCoordinate) {
-                isVictory = checkColumnPlane(column, player);
-            }
-        } else if (cellType == CellType.VERTEX) {
-            isVictory = checkBoardPlane(board, player) ||
-                    checkLinePlane(line, player) ||
-                    checkColumnPlane(column, player);
-        }
-
-        return isVictory;
-    }
-
-    private boolean checkWinCondition3dDiagonals(Move move, CellType cellType) {
         final int player = move.getPlayer();
 
         final int LAST = SIZE - 1;
@@ -179,7 +222,16 @@ public class Match {
         return (diagonal1Victory || diagonal2Victory || diagonal3Victory || diagonal4Victory);
     }
 
-    private static CellType getCellType(Move move) throws InvalidCellTypeException {
+    private void endTurn() {
+        final int currentPlayer = this.currentPlayer;
+        this.currentPlayer = currentPlayer == 1 ? 2 : 1;
+    }
+
+    private void endMatch() {
+        this.isGameRunning = false;
+    }
+
+    private static CellType getCellType(Move move) {
         int extremities = 0;
 
         final int board = move.getBoard();
@@ -199,41 +251,5 @@ public class Match {
         }
 
         return CellType.from(extremities);
-    }
-
-    public boolean makeMove(Move move, int player) {
-        try {
-            assertLegalMove(move);
-
-            final int board = move.getBoard();
-            final int line = move.getLine();
-            final int column = move.getColumn();
-
-            this.cells[board][line][column] = player;
-
-            CellType cellType = getCellType(move);
-
-            boolean isVictory = checkWinConditionStraightLines(move);
-
-            if (!isVictory) {
-                isVictory = checkWinCondition2dDiagonals(move, cellType);
-            }
-
-            if (!isVictory && (cellType == CellType.CUBE_CENTER || cellType == CellType.VERTEX)) {
-                isVictory = checkWinCondition3dDiagonals(move, cellType);
-            }
-
-            if (isVictory) {
-                isGameRunning = false;
-            }
-
-            return isVictory;
-        } catch (InvalidMoveException e) {
-            System.out.println(e);
-        } catch (InvalidCellTypeException e) {
-            System.out.println(e);
-        }
-
-        return false;
     }
 }

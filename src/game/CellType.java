@@ -1,17 +1,16 @@
 package game;
 
-import game.exceptions.InvalidCellTypeException;
-
 public enum CellType {
     VERTEX(3),
     EDGE(2),
     FACE_CENTER(1),
-    CUBE_CENTER(0);
+    CUBE_CENTER(0),
+    INVALID(-1);
 
     CellType(int extremities) {
     }
 
-    public static CellType from(int extremities) throws InvalidCellTypeException {
+    public static CellType from(int extremities) {
         switch (extremities) {
             case (0):
                 return CellType.CUBE_CENTER;
@@ -22,7 +21,7 @@ public enum CellType {
             case (3):
                 return CellType.VERTEX;
             default:
-                throw new InvalidCellTypeException();
+                return CellType.INVALID;
         }
     }
 }
