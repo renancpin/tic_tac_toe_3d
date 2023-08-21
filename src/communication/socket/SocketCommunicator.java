@@ -47,6 +47,7 @@ public class SocketCommunicator implements Communicator {
                 case MESSAGE:
                     ostream.writeByte(0);
                     ostream.writeUTF(command.getMessage());
+                    ostream.flush();
                     break;
                 case MOVE:
                     final Move move = command.getMove();
@@ -61,12 +62,14 @@ public class SocketCommunicator implements Communicator {
 
                     ostream.writeByte(1);
                     ostream.writeUTF(message);
+                    ostream.flush();
                     break;
                 case ERROR:
                     final Exception error = command.getException();
 
                     ostream.writeByte(2);
                     ostream.writeUTF(error.toString());
+                    ostream.flush();
                     break;
             }
         } catch (Exception e) {
@@ -86,10 +89,12 @@ public class SocketCommunicator implements Communicator {
 
                 command = new Command(message);
             } else if (type == CommandType.MOVE) {
-                final int player = Character.getNumericValue(istream.readChar());
-                final int board = Character.getNumericValue(istream.readChar());
-                final int line = Character.getNumericValue(istream.readChar());
-                final int column = Character.getNumericValue(istream.readChar());
+                final String play = istream.readUTF();
+
+                final int player = Character.getNumericValue(play.charAt(0));
+                final int board = Character.getNumericValue(play.charAt(1));
+                final int line = Character.getNumericValue(play.charAt(2));
+                final int column = Character.getNumericValue(play.charAt(3));
 
                 final Move move = new Move(player, board, line, column);
 

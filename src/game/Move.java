@@ -88,6 +88,6 @@ public class Move {
     }
 
     public String toString() {
-        return "[" + this.board + ' ' + this.column + ' ' + this.line + "]";
+        return "[Player " + this.player + "] B" + this.board + " R" + this.line + " C" + this.column;
     }
 }
