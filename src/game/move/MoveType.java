@@ -1,18 +1,18 @@
-package game;
+package game.move;
 
 public enum MoveType {
-    VERTEX(3),
-    EDGE(2),
-    FACE_CENTER(1),
+    INVALID(-1),
     CUBE_CENTER(0),
-    RENDITION(-1),
+    FACE_CENTER(1),
+    EDGE(2),
+    VERTEX(3),
     SKIP_TURN(-2),
-    INVALID(-3);
+    SURRENDER(-3);
 
     MoveType(int extremities) {
     }
 
-    public static MoveType from(int extremities) {
+    public static MoveType fromInt(int extremities) {
         switch (extremities) {
             case (0):
                 return MoveType.CUBE_CENTER;
@@ -22,12 +22,12 @@ public enum MoveType {
                 return MoveType.EDGE;
             case (3):
                 return MoveType.VERTEX;
-            case (-1):
-                return MoveType.RENDITION;
-            case (-2):
-                return MoveType.SKIP_TURN;
-            default:
-                return MoveType.INVALID;
         }
+
+        return MoveType.INVALID;
+    }
+
+    public static MoveType fromChar(char ch) {
+        return MoveType.fromInt(Character.getNumericValue(ch));
     }
 }

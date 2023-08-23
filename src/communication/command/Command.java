@@ -1,11 +1,12 @@
-package communication;
+package communication.command;
 
-import game.Move;
+import game.instructions.Instruction;
+import game.move.Move;
 
 public class Command {
     private String message;
     private Move move;
-    private Exception error;
+    private Instruction instruction;
 
     private CommandType type;
 
@@ -19,9 +20,9 @@ public class Command {
         this.move = move;
     }
 
-    public Command(Exception error) {
-        this.type = CommandType.ERROR;
-        this.error = error;
+    public Command(Instruction instruction) {
+        this.type = CommandType.INSTRUCTION;
+        this.instruction = instruction;
     }
 
     public CommandType getType() {
@@ -36,7 +37,7 @@ public class Command {
         return this.move;
     }
 
-    public Exception getException() {
-        return this.error;
+    public Instruction getInstruction() {
+        return this.instruction;
     }
 }

@@ -1,11 +1,40 @@
-package game;
+package game.match;
 
+import java.io.IOException;
+import java.util.Random;
+
+import communication.command.Command;
+import communication.communicator.Communicator;
 import game.exceptions.*;
+import game.instructions.*;
+import game.move.*;
 
 public class HostedMatch implements Match {
     private int[][][] cells = new int[BOARD_SIZE][BOARD_SIZE][BOARD_SIZE];
     private boolean isGameRunning = true;
     private int currentPlayer = 1;
+    private final int thisPlayer;
+    private final Communicator communicator;
+
+    public HostedMatch(Communicator communicator, int port) {
+        this.thisPlayer = (new Random()).nextInt(1, 2);
+        this.communicator = communicator;
+
+        communicator.host(port);
+
+        final int guest = thisPlayer == 1 ? 2 : 1;
+        Instruction instruction = Instruction.setGuest(guest);
+
+        try {
+            communicator.sendCommand(new Command(instruction));
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    public int getThisPlayer() {
+        return this.thisPlayer;
+    }
 
     public int getCurrentPlayer() {
         return this.currentPlayer;
@@ -15,10 +44,40 @@ public class HostedMatch implements Match {
         return this.isGameRunning;
     }
 
-    public void makeMove(Move move) throws InvalidMoveException {
-        move.setMoveType(BOARD_SIZE);
+    public int getCell(int board, int line, int column) {
+        return this.cells[board][line][column];
+    }
 
-        assertLegalMove(move);
+    public void handleMessage(String message) {
+        Command command = new Command("[HOST]" + message);
+
+        try {
+            this.communicator.sendCommand(command);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    public void handleMove(Move move) {
+        try {
+            assertLegalMove(move);
+        } catch (InvalidMoveException exception) {
+            this.handleMessage("[ERROR]" + exception.toString());
+            return;
+        }
+
+        final MoveType moveType = move.getMoveType();
+
+        if (moveType == MoveType.SKIP_TURN) {
+            endTurn();
+            return;
+        }
+
+        if (moveType == MoveType.SURRENDER) {
+            endTurn();
+            endMatch();
+            return;
+        }
 
         registerMove(move);
 
@@ -28,73 +87,45 @@ public class HostedMatch implements Match {
 
         if (isVictory) {
             endMatch();
+            return;
         }
 
         endTurn();
     }
 
-    public void skipTurn(int player) throws InvalidMoveException {
-        Move move = Move.SkipTurn(player);
-
-        assertLegalMove(move);
-
-        registerMove(move);
-    }
-
-    public void surrender(int player) throws InvalidMoveException {
-        Move move = Move.Rendition(player);
-
-        assertLegalMove(move);
-
-        registerMove(move);
+    public void handleInstruction(Instruction instruction) {
+        System.out.println("HOST nao recebe instrucoes");
     }
 
     private void assertLegalMove(Move move) throws InvalidMoveException {
-        if (!isGameRunning) {
+        if (!this.isGameRunning) {
             throw new InvalidMoveException(InvalidMoveExceptionMotive.GAME_OVER, move);
         }
 
         final int player = move.getPlayer();
-        if (player == 0 || player != this.currentPlayer) {
+
+        if (player != this.currentPlayer) {
             throw new InvalidMoveException(InvalidMoveExceptionMotive.INVALID_TURN, move);
         }
 
+        move.setMoveType(BOARD_SIZE);
+
         final MoveType moveType = move.getMoveType();
-        if (moveType == MoveType.RENDITION || moveType == MoveType.SKIP_TURN) {
-            return;
+
+        if (moveType == MoveType.INVALID) {
+            throw new InvalidMoveException(InvalidMoveExceptionMotive.OUT_OF_BOUNDS, move);
+
         }
 
         final int board = move.getBoard();
         final int line = move.getLine();
         final int column = move.getColumn();
-
-        final int[] coords = { board, line, column };
-
-        for (int coord : coords) {
-            if (coord < 0 || coord >= BOARD_SIZE) {
-                throw new InvalidMoveException(InvalidMoveExceptionMotive.OUT_OF_BOUNDS, move);
-            }
-        }
-
         if (this.cells[board][line][column] != 0) {
             throw new InvalidMoveException(InvalidMoveExceptionMotive.NON_EMPTY, move);
         }
     }
 
     private void registerMove(Move move) {
-        final MoveType moveType = move.getMoveType();
-
-        if (moveType == MoveType.SKIP_TURN) {
-            endTurn();
-            return;
-        } else if (moveType == MoveType.RENDITION) {
-            endTurn();
-            endMatch();
-            return;
-        } else if (moveType == MoveType.INVALID) {
-            return;
-        }
-
         final int player = move.getPlayer();
 
         final int board = move.getBoard();
@@ -103,7 +134,13 @@ public class HostedMatch implements Match {
 
         this.cells[board][line][column] = player;
 
-        endTurn();
+        Instruction instruction = Instruction.setCell(move);
+
+        try {
+            this.communicator.sendCommand(new Command(instruction));
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
     }
 
     private boolean checkWinConditionStraightLines(Move move) {
@@ -265,9 +302,24 @@ public class HostedMatch implements Match {
     private void endTurn() {
         final int currentPlayer = this.currentPlayer;
         this.currentPlayer = currentPlayer == 1 ? 2 : 1;
+        final Instruction instruction = Instruction.setTurn(this.currentPlayer);
+
+        try {
+            this.communicator.sendCommand(new Command(instruction));
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
     }
 
     private void endMatch() {
         this.isGameRunning = false;
+
+        final Instruction instruction = Instruction.endMatch(this.currentPlayer);
+
+        try {
+            this.communicator.sendCommand(new Command(instruction));
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
     }
 }
