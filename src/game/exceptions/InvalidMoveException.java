@@ -3,7 +3,7 @@ package game.exceptions;
 import java.util.HashMap;
 import java.util.Map;
 
-import game.Move;
+import game.move.Move;
 
 public class InvalidMoveException extends Exception {
     private String move;
