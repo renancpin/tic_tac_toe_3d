@@ -1,22 +1,30 @@
 package game.match;
 
-import game.instructions.Instruction;
+import java.util.function.Consumer;
+
+import communication.command.Command;
 import game.move.Move;
 
-public interface Match {
+public abstract class Match {
     public static final int BOARD_SIZE = 3;
 
-    public void handleInstruction(Instruction instruction);
+    public static int getNextPlayer(int currentPlayer) {
+        return currentPlayer == 1 ? 2 : 1;
+    }
 
-    public void handleMove(Move move);
+    public abstract void handleMove(Move move);
 
-    public void handleMessage(String message);
+    public abstract void handleMessage(String message);
 
-    public int getCurrentPlayer();
+    public abstract void listen(Consumer<Command> listener);
 
-    public boolean getIsRunning();
+    public abstract void start();
 
-    public int getThisPlayer();
+    public abstract boolean getIsRunning();
 
-    public int getCell(int board, int line, int column);
+    public abstract int getThisPlayer();
+
+    public abstract int getCurrentPlayer();
+
+    public abstract int getCell(int board, int line, int column);
 }

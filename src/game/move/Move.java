@@ -60,15 +60,15 @@ public class Move {
     }
 
     public void setMoveType(int boardSize) {
-        if (this.moveType != MoveType.INVALID) {
+        if (moveType != MoveType.INVALID) {
             return;
         }
 
         int extremities = 0;
 
-        final int board = this.getBoard();
-        final int line = this.getLine();
-        final int column = this.getColumn();
+        final int board = getBoard();
+        final int line = getLine();
+        final int column = getColumn();
 
         if (board == -1 || line == -1 || column == -1) {
             this.moveType = MoveType.INVALID;
@@ -91,6 +91,6 @@ public class Move {
     }
 
     public String toString() {
-        return "[Player " + this.player + "] Board " + this.board + " Row " + this.line + " Column " + this.column;
+        return "[Player " + getPlayer() + "] Board " + getBoard() + " Row " + getLine() + " Column " + getColumn();
     }
 }

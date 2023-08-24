@@ -1,5 +1,5 @@
 package controllers;
 
-public interface Controller extends Runnable {
+public interface Controller {
     public void start();
 }
