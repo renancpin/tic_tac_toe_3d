@@ -1,68 +1,117 @@
 package game.match;
 
-import java.io.IOException;
+import java.util.HashSet;
 import java.util.Random;
+import java.util.Set;
+import java.util.function.Consumer;
 
 import communication.command.Command;
+import communication.command.CommandType;
 import communication.communicator.Communicator;
 import game.exceptions.*;
 import game.instructions.*;
 import game.move.*;
 
-public class HostedMatch implements Match {
+public class HostedMatch extends Match implements Runnable {
     private int[][][] cells = new int[BOARD_SIZE][BOARD_SIZE][BOARD_SIZE];
-    private boolean isGameRunning = true;
+    private boolean isGameRunning = false;
     private int currentPlayer = 1;
     private final int thisPlayer;
     private final Communicator communicator;
+    private final Set<Consumer<Command>> consumers = new HashSet<>();
 
-    public HostedMatch(Communicator communicator, int port) {
+    public HostedMatch(Communicator communicator) {
         this.thisPlayer = (new Random()).nextInt(1, 2);
         this.communicator = communicator;
+    }
 
-        communicator.host(port);
-
-        final int guest = thisPlayer == 1 ? 2 : 1;
-        Instruction instruction = Instruction.setGuest(guest);
-
-        try {
-            communicator.sendCommand(new Command(instruction));
-        } catch (IOException e) {
-            e.printStackTrace();
+    private void notify(Command command) {
+        for (Consumer<Command> consumer : consumers) {
+            consumer.accept(command);
         }
     }
 
-    public int getThisPlayer() {
-        return this.thisPlayer;
+    @Override
+    public void listen(Consumer<Command> listener) {
+        consumers.add(listener);
     }
 
-    public int getCurrentPlayer() {
-        return this.currentPlayer;
+    @Override
+    public void start() {
+        Thread thread = new Thread(this);
+        thread.start();
     }
 
+    @Override
+    public void run() {
+        communicator.host();
+
+        int guest = getNextPlayer(thisPlayer);
+        Command command = new Command(Instruction.setGuest(guest));
+
+        notify(command);
+        communicator.sendCommand(command);
+
+        this.isGameRunning = true;
+
+        while (isGameRunning) {
+            command = communicator.receiveCommand();
+
+            if (command == null) {
+                break;
+            }
+
+            CommandType commandType = command.getType();
+
+            switch (commandType) {
+                case MESSAGE:
+                    String message = command.getMessage();
+                    notify(new Command("[GUEST] " + message));
+                    break;
+                case MOVE:
+                    Move move = command.getMove();
+                    handleMove(move);
+                    break;
+                default:
+                    break;
+            }
+        }
+
+    }
+
+    @Override
     public boolean getIsRunning() {
         return this.isGameRunning;
     }
 
+    @Override
+    public int getThisPlayer() {
+        return this.thisPlayer;
+    }
+
+    @Override
+    public int getCurrentPlayer() {
+        return this.currentPlayer;
+    }
+
+    @Override
     public int getCell(int board, int line, int column) {
         return this.cells[board][line][column];
     }
 
+    @Override
     public void handleMessage(String message) {
-        Command command = new Command("[HOST]" + message);
+        Command command = new Command(message);
 
-        try {
-            this.communicator.sendCommand(command);
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
+        communicator.sendCommand(command);
     }
 
+    @Override
     public void handleMove(Move move) {
         try {
             assertLegalMove(move);
         } catch (InvalidMoveException exception) {
-            this.handleMessage("[ERROR]" + exception.toString());
+            handleMessage("[ERROR] " + exception.toString());
             return;
         }
 
@@ -93,18 +142,14 @@ public class HostedMatch implements Match {
         endTurn();
     }
 
-    public void handleInstruction(Instruction instruction) {
-        System.out.println("HOST nao recebe instrucoes");
-    }
-
     private void assertLegalMove(Move move) throws InvalidMoveException {
-        if (!this.isGameRunning) {
+        if (!isGameRunning) {
             throw new InvalidMoveException(InvalidMoveExceptionMotive.GAME_OVER, move);
         }
 
         final int player = move.getPlayer();
 
-        if (player != this.currentPlayer) {
+        if (player != currentPlayer) {
             throw new InvalidMoveException(InvalidMoveExceptionMotive.INVALID_TURN, move);
         }
 
@@ -120,7 +165,7 @@ public class HostedMatch implements Match {
         final int board = move.getBoard();
         final int line = move.getLine();
         final int column = move.getColumn();
-        if (this.cells[board][line][column] != 0) {
+        if (cells[board][line][column] != 0) {
             throw new InvalidMoveException(InvalidMoveExceptionMotive.NON_EMPTY, move);
         }
     }
@@ -132,15 +177,35 @@ public class HostedMatch implements Match {
         final int line = move.getLine();
         final int column = move.getColumn();
 
-        this.cells[board][line][column] = player;
+        cells[board][line][column] = player;
 
         Instruction instruction = Instruction.setCell(move);
 
-        try {
-            this.communicator.sendCommand(new Command(instruction));
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
+        Command command = new Command(instruction);
+
+        notify(command);
+        communicator.sendCommand(command);
+    }
+
+    private void endTurn() {
+        currentPlayer = getNextPlayer(currentPlayer);
+        final Instruction instruction = Instruction.setTurn(currentPlayer);
+
+        Command command = new Command(instruction);
+
+        notify(command);
+        communicator.sendCommand(command);
+    }
+
+    private void endMatch() {
+        isGameRunning = false;
+
+        final Instruction instruction = Instruction.endMatch(currentPlayer);
+
+        Command command = new Command(instruction);
+
+        notify(command);
+        communicator.sendCommand(command);
     }
 
     private boolean checkWinConditionStraightLines(Move move) {
@@ -155,15 +220,15 @@ public class HostedMatch implements Match {
         boolean perpendicularVictory = true;
 
         for (int i = 0; i < BOARD_SIZE; i++) {
-            if (this.cells[i][line][column] != player) {
+            if (cells[i][line][column] != player) {
                 perpendicularVictory = false;
             }
 
-            if (this.cells[board][i][column] != player) {
+            if (cells[board][i][column] != player) {
                 lineVictory = false;
             }
 
-            if (this.cells[board][line][i] != player) {
+            if (cells[board][line][i] != player) {
                 columnVictory = false;
             }
         }
@@ -213,11 +278,11 @@ public class HostedMatch implements Match {
         boolean diagonal2Victory = true;
 
         for (int i = 0; i < BOARD_SIZE; i++) {
-            if (this.cells[board][i][i] != player) {
+            if (cells[board][i][i] != player) {
                 diagonal1Victory = false;
             }
 
-            if (this.cells[board][i][BOARD_SIZE - 1 - i] != player) {
+            if (cells[board][i][BOARD_SIZE - 1 - i] != player) {
                 diagonal2Victory = false;
             }
         }
@@ -230,11 +295,11 @@ public class HostedMatch implements Match {
         boolean diagonal2Victory = true;
 
         for (int i = 0; i < BOARD_SIZE; i++) {
-            if (this.cells[i][line][i] != player) {
+            if (cells[i][line][i] != player) {
                 diagonal1Victory = false;
             }
 
-            if (this.cells[i][line][BOARD_SIZE - 1 - i] != player) {
+            if (cells[i][line][BOARD_SIZE - 1 - i] != player) {
                 diagonal2Victory = false;
             }
         }
@@ -247,11 +312,11 @@ public class HostedMatch implements Match {
         boolean diagonal2Victory = true;
 
         for (int i = 0; i < BOARD_SIZE; i++) {
-            if (this.cells[i][i][column] != player) {
+            if (cells[i][i][column] != player) {
                 diagonal1Victory = false;
             }
 
-            if (this.cells[i][BOARD_SIZE - 1 - i][column] != player) {
+            if (cells[i][BOARD_SIZE - 1 - i][column] != player) {
                 diagonal2Victory = false;
             }
         }
@@ -276,50 +341,26 @@ public class HostedMatch implements Match {
 
         for (int i = 0; i < BOARD_SIZE; i++) {
             // [0][0][0] to [LAST][LAST][LAST]
-            if (this.cells[i][i][i] != player) {
+            if (cells[i][i][i] != player) {
                 diagonal1Victory = false;
             }
 
             // [0][0][LAST] to [LAST][LAST][0]
-            if (this.cells[i][i][LAST - i] != player) {
+            if (cells[i][i][LAST - i] != player) {
                 diagonal2Victory = false;
             }
 
             // [0][LAST][0] to [LAST][0][LAST]
-            if (this.cells[i][LAST - i][i] != player) {
+            if (cells[i][LAST - i][i] != player) {
                 diagonal3Victory = false;
             }
 
             // [0][LAST][LAST] to [LAST][0][0]
-            if (this.cells[i][LAST - i][LAST - i] != player) {
+            if (cells[i][LAST - i][LAST - i] != player) {
                 diagonal4Victory = false;
             }
         }
 
         return (diagonal1Victory || diagonal2Victory || diagonal3Victory || diagonal4Victory);
-    }
-
-    private void endTurn() {
-        final int currentPlayer = this.currentPlayer;
-        this.currentPlayer = currentPlayer == 1 ? 2 : 1;
-        final Instruction instruction = Instruction.setTurn(this.currentPlayer);
-
-        try {
-            this.communicator.sendCommand(new Command(instruction));
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-    }
-
-    private void endMatch() {
-        this.isGameRunning = false;
-
-        final Instruction instruction = Instruction.endMatch(this.currentPlayer);
-
-        try {
-            this.communicator.sendCommand(new Command(instruction));
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
     }
 }

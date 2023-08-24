@@ -1,15 +1,16 @@
 package communication.communicator;
 
-import java.io.IOException;
-
 import communication.command.Command;
 
 public interface Communicator {
-    public void connect(String host, int port);
+    public static final int PORT = 3000;
+    public static final String HOST = "";
 
-    public void host(int port);
+    public void connect();
 
-    public void sendCommand(Command command) throws IOException;
+    public void host();
 
-    public Command receiveCommand() throws IOException;
+    public void sendCommand(Command command);
+
+    public Command receiveCommand();
 }
