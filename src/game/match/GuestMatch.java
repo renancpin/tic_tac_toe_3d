@@ -1,45 +1,74 @@
 package game.match;
 
+import java.util.HashSet;
+import java.util.Set;
+import java.util.function.Consumer;
+
 import communication.command.Command;
+import communication.command.CommandType;
 import communication.communicator.Communicator;
-import game.instructions.Instruction;
-import game.instructions.InstructionType;
+import game.instructions.*;
 import game.move.Move;
 
-public class GuestMatch implements Match {
-    private int currentPlayer = 1;
-    private boolean isGameRunning = true;
+public class GuestMatch extends Match implements Runnable {
     private int[][][] cells = new int[BOARD_SIZE][BOARD_SIZE][BOARD_SIZE];
-
+    private boolean isGameRunning = false;
+    private int currentPlayer = 1;
     private int thisPlayer;
     private final Communicator communicator;
+    private Set<Consumer<Command>> consumers = new HashSet<>();
 
-    public GuestMatch(Communicator communicator, int port) {
+    public GuestMatch(Communicator communicator) {
         this.communicator = communicator;
-
-        communicator.connect("", port);
     }
 
-    public void handleMessage(String message) {
-        Command command = new Command("[GUEST]" + message);
-
-        try {
-            this.communicator.sendCommand(command);
-        } catch (Exception e) {
+    private void notify(Command command) {
+        for (Consumer<Command> consumer : consumers) {
+            consumer.accept(command);
         }
     }
 
-    public void handleMove(Move move) {
-        Command command = new Command(move);
-
-        try {
-            this.communicator.sendCommand(command);
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
+    @Override
+    public void listen(Consumer<Command> listener) {
+        consumers.add(listener);
     }
 
-    public void handleInstruction(Instruction instruction) {
+    @Override
+    public void start() {
+        Thread thread = new Thread(this);
+        thread.start();
+    }
+
+    @Override
+    public boolean getIsRunning() {
+        return this.isGameRunning;
+    }
+
+    @Override
+    public int getThisPlayer() {
+        return this.thisPlayer;
+    }
+
+    @Override
+    public int getCurrentPlayer() {
+        return this.currentPlayer;
+    }
+
+    @Override
+    public int getCell(int board, int line, int column) {
+        return this.cells[board][line][column];
+    }
+
+    private void registerMove(Move move) {
+        final int player = move.getPlayer();
+        final int board = move.getBoard();
+        final int line = move.getLine();
+        final int column = move.getColumn();
+
+        cells[board][line][column] = player;
+    }
+
+    private void handleInstruction(Instruction instruction) {
         final InstructionType instructionType = instruction.getType();
 
         switch (instructionType) {
@@ -54,35 +83,69 @@ public class GuestMatch implements Match {
                 this.isGameRunning = false;
                 break;
             case SET_CELL:
-                this.registerMove(instruction.getMove());
+                registerMove(instruction.getMove());
                 break;
             case INVALID:
-                System.out.println("Instrucao invalida");
+                notify(new Command("Instrucao invalida"));
+                return;
         }
+
+        notify(new Command(instruction));
     }
 
-    public int getThisPlayer() {
-        return this.thisPlayer;
+    @Override
+    public void handleMessage(String message) {
+        Command command = new Command(message);
+
+        communicator.sendCommand(command);
     }
 
-    public int getCurrentPlayer() {
-        return this.currentPlayer;
+    @Override
+    public void handleMove(Move move) {
+        Command command = new Command(move);
+
+        communicator.sendCommand(command);
     }
 
-    public boolean getIsRunning() {
-        return this.isGameRunning;
-    }
+    @Override
+    public void run() {
+        communicator.connect();
 
-    public int getCell(int board, int line, int column) {
-        return this.cells[board][line][column];
-    }
+        Command command = null;
+        CommandType commandType;
 
-    private void registerMove(Move move) {
-        final int player = move.getPlayer();
-        final int board = move.getBoard();
-        final int line = move.getLine();
-        final int column = move.getColumn();
+        try {
+            command = communicator.receiveCommand();
+        } catch (Exception e) {
+        }
 
-        this.cells[board][line][column] = player;
+        if (command != null && command.getType() == CommandType.INSTRUCTION) {
+            handleInstruction(command.getInstruction());
+        }
+
+        isGameRunning = true;
+
+        while (isGameRunning) {
+            command = communicator.receiveCommand();
+
+            if (command == null) {
+                break;
+            }
+
+            commandType = command.getType();
+
+            switch (commandType) {
+                case MESSAGE:
+                    String message = command.getMessage();
+                    notify(new Command("[HOST] " + message));
+                    break;
+                case INSTRUCTION:
+                    Instruction instruction = command.getInstruction();
+                    handleInstruction(instruction);
+                    break;
+                default:
+                    break;
+            }
+        }
     }
 }

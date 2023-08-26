@@ -12,20 +12,39 @@ import communication.command.CommandType;
 import communication.communicator.Communicator;
 import game.instructions.Instruction;
 import game.instructions.InstructionType;
+import game.match.Match;
 import game.move.Move;
+import game.move.MoveType;
 
 public class SocketCommunicator implements Communicator {
     private PrintWriter outputStream = null;
     private BufferedReader inputStream = null;
+    private final int PORT;
+    private final String HOST;
+
+    public SocketCommunicator() {
+        this.PORT = Communicator.PORT;
+        this.HOST = Communicator.HOST;
+    }
+
+    public SocketCommunicator(int port) {
+        this.HOST = Communicator.HOST;
+        this.PORT = port;
+    }
+
+    public SocketCommunicator(String host, int port) {
+        this.HOST = host;
+        this.PORT = port;
+    }
 
     private void setIO(Socket socket) throws IOException {
         this.inputStream = new BufferedReader(new InputStreamReader(socket.getInputStream()));
         this.outputStream = new PrintWriter(socket.getOutputStream(), true);
     }
 
-    public void connect(String host, int port) {
+    public void connect() {
         try {
-            final Socket socket = new Socket(host, port);
+            final Socket socket = new Socket(this.HOST, this.PORT);
 
             setIO(socket);
         } catch (Exception e) {
@@ -33,8 +52,8 @@ public class SocketCommunicator implements Communicator {
         }
     }
 
-    public void host(int port) {
-        try (final ServerSocket serverSocket = new ServerSocket(port)) {
+    public void host() {
+        try (final ServerSocket serverSocket = new ServerSocket(this.PORT)) {
             final Socket socket = serverSocket.accept();
 
             setIO(socket);
@@ -63,15 +82,11 @@ public class SocketCommunicator implements Communicator {
                 serializedCommand = "";
         }
 
-        try {
-            String serializedCommandType = Integer.toString(commandType.toInt());
-            outputStream.println(serializedCommandType + serializedCommand);
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
+        String serializedCommandType = Integer.toString(commandType.toInt());
+        outputStream.println(serializedCommandType + serializedCommand);
     }
 
-    public Command receiveCommand() throws IOException {
+    public Command receiveCommand() {
         try {
             final String input = inputStream.readLine();
             final char firstChar = input.charAt(0);
@@ -88,14 +103,21 @@ public class SocketCommunicator implements Communicator {
                     return new Command(parseInstruction(message));
             }
         } catch (Exception e) {
-            e.printStackTrace();
         }
 
-        throw new IOException("Erro não tratado");
+        return null;
     }
 
     private static String serializeMove(Move move) {
+        final MoveType moveType = move.getMoveType();
         final int player = move.getPlayer();
+
+        if (moveType == MoveType.SKIP_TURN) {
+            return "" + player + (Match.BOARD_SIZE + 1);
+        } else if (moveType == MoveType.SURRENDER) {
+            return "" + player + (Match.BOARD_SIZE + 2);
+        }
+
         final int board = move.getBoard();
         final int line = move.getLine();
         final int column = move.getColumn();
@@ -125,6 +147,13 @@ public class SocketCommunicator implements Communicator {
     private static Move parseMove(String input) {
         final int player = Character.getNumericValue(input.charAt(0));
         final int board = Character.getNumericValue(input.charAt(1));
+
+        if (board == Match.BOARD_SIZE + 1) {
+            return Move.SkipTurn(player);
+        } else if (board == Match.BOARD_SIZE + 2) {
+            return Move.Surrender(player);
+        }
+
         final int line = Character.getNumericValue(input.charAt(2));
         final int column = Character.getNumericValue(input.charAt(3));
 
