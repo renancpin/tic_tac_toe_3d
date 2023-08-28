@@ -16,12 +16,13 @@ public class HostedMatch extends Match implements Runnable {
     private int[][][] cells = new int[BOARD_SIZE][BOARD_SIZE][BOARD_SIZE];
     private boolean isGameRunning = false;
     private int currentPlayer = 1;
+    private int playCount = BOARD_SIZE * BOARD_SIZE * BOARD_SIZE;
     private final int thisPlayer;
     private final Communicator communicator;
     private final Set<Consumer<Command>> consumers = new HashSet<>();
 
     public HostedMatch(Communicator communicator) {
-        this.thisPlayer = (new Random()).nextInt(1, 2);
+        this.thisPlayer = (new Random()).nextInt(1, 3);
         this.communicator = communicator;
     }
 
@@ -134,6 +135,11 @@ public class HostedMatch extends Match implements Runnable {
                 || checkWinCondition2dDiagonals(move)
                 || checkWinCondition3dDiagonals(move);
 
+        if (playCount <= 0) {
+            currentPlayer = 0;
+            isVictory = true;
+        }
+
         if (isVictory) {
             endMatch();
             return;
@@ -178,6 +184,8 @@ public class HostedMatch extends Match implements Runnable {
         final int column = move.getColumn();
 
         cells[board][line][column] = player;
+
+        playCount--;
 
         Instruction instruction = Instruction.setCell(move);
 

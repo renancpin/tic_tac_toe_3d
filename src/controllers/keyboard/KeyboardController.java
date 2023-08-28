@@ -114,7 +114,7 @@ public class KeyboardController implements Controller {
                 break;
             }
 
-            if (Character.isDigit(input.charAt(0)) || input.charAt(0) == '/') {
+            if (input.length() > 0 && (Character.isDigit(input.charAt(0)) || input.charAt(0) == '/')) {
                 handleMove(input);
             } else {
                 handleMessage(input);
