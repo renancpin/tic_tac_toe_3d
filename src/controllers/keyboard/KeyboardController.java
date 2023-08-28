@@ -114,7 +114,7 @@ public class KeyboardController implements Controller {
                 break;
             }
 
-            if (Character.isDigit(input.charAt(0)) || input.charAt(0) == '/') {
+            if (input.length() > 0 && (Character.isDigit(input.charAt(0)) || input.charAt(0) == '/')) {
                 handleMove(input);
             } else {
                 handleMessage(input);
@@ -148,6 +148,11 @@ public class KeyboardController implements Controller {
                         int thisPlayer = match.getThisPlayer();
                         int currentPlayer = match.getCurrentPlayer();
                         System.out.println(thisPlayer == currentPlayer ? "Sua vez" : "Aguarde sua vez");
+                        promptInteraction();
+                        break;
+                    case SET_CELL:
+                        printCells();
+                        promptInteraction();
                         break;
                     case END_MATCH:
                         System.out.println("Partida encerrada!");
@@ -158,7 +163,6 @@ public class KeyboardController implements Controller {
                         break;
                 }
 
-                promptInteraction();
                 break;
         }
     }
