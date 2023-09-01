@@ -159,9 +159,15 @@ public class HostedMatch extends Match implements Runnable {
             throw new InvalidMoveException(InvalidMoveExceptionMotive.INVALID_TURN, move);
         }
 
+        MoveType moveType = move.getMoveType();
+
+        if (moveType == MoveType.SKIP_TURN || moveType == MoveType.SURRENDER) {
+            return;
+        }
+
         move.setMoveType(BOARD_SIZE);
 
-        final MoveType moveType = move.getMoveType();
+        moveType = move.getMoveType();
 
         if (moveType == MoveType.INVALID) {
             throw new InvalidMoveException(InvalidMoveExceptionMotive.OUT_OF_BOUNDS, move);
