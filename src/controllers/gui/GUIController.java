@@ -1,3 +1,5 @@
+package controllers.gui;
+
 import java.awt.EventQueue;
 
 import javax.swing.JFrame;
