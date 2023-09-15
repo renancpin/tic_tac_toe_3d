@@ -348,10 +348,10 @@ public class HostedMatch extends Match implements Runnable {
         final int player = move.getPlayer();
 
         final int LAST = BOARD_SIZE - 1;
-        boolean diagonal1Victory = false;
-        boolean diagonal2Victory = false;
-        boolean diagonal3Victory = false;
-        boolean diagonal4Victory = false;
+        boolean diagonal2Victory = true;
+        boolean diagonal3Victory = true;
+        boolean diagonal4Victory = true;
+        boolean diagonal1Victory = true;
 
         for (int i = 0; i < BOARD_SIZE; i++) {
             // [0][0][0] to [LAST][LAST][LAST]
