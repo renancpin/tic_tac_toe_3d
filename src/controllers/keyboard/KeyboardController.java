@@ -2,20 +2,20 @@ package controllers.keyboard;
 
 import java.util.Scanner;
 
-import communication.command.Command;
-import communication.command.CommandType;
-import controllers.Controller;
+import controllers.ControllerInterface;
+import game.instructions.Instruction;
 import game.instructions.InstructionType;
-import game.match.Match;
-import game.match.MatchBuilder;
+import game.match.MatchInterface;
+import game.match.MatchBuilderInterface;
 import game.move.Move;
 
-public class KeyboardController implements Controller {
-    private MatchBuilder matchBuilder;
-    private Match match;
+public class KeyboardController implements ControllerInterface {
+    private MatchBuilderInterface matchBuilder;
+    private MatchInterface match;
     private Scanner console = new Scanner(System.in);
+    private int thisPlayer;
 
-    public KeyboardController(MatchBuilder matchBuilder) {
+    public KeyboardController(MatchBuilderInterface matchBuilder) {
         this.matchBuilder = matchBuilder;
     }
 
@@ -26,7 +26,7 @@ public class KeyboardController implements Controller {
         boolean isHost = tipoPartida.equals("1");
 
         match = matchBuilder.createMatch(isHost);
-        match.listen(this::handleUpdate);
+        match.join(this);
         match.start();
 
         handleInteraction();
@@ -35,25 +35,24 @@ public class KeyboardController implements Controller {
     }
 
     private void handleMessage(String input) {
-        match.handleMessage(input);
+        match.sendMessage(input, thisPlayer);
     }
 
     private void handleMove(String input) {
-        int player = match.getThisPlayer();
         Move move = null;
 
         if (input.charAt(0) == '/') {
 
             if (input.equals("/ff")) {
-                move = Move.Surrender(player);
+                move = Move.Surrender(thisPlayer);
             } else if (input.equals("/skip")) {
-                move = Move.SkipTurn(player);
+                move = Move.SkipTurn(thisPlayer);
             } else {
                 System.out.println("Movimento invalido");
             }
 
             if (move != null) {
-                match.handleMove(move);
+                match.sendMove(move);
             }
 
             return;
@@ -63,18 +62,18 @@ public class KeyboardController implements Controller {
         int line = Character.getNumericValue(input.charAt(1));
         int column = Character.getNumericValue(input.charAt(2));
 
-        move = new Move(player, board, line, column);
+        move = new Move(thisPlayer, board, line, column);
 
-        match.handleMove(move);
+        match.sendMove(move);
     }
 
     private void printCells() {
         final int currentPlayer = match.getCurrentPlayer();
 
         System.out.print('\n');
-        for (int line = 0; line < Match.BOARD_SIZE; line++) {
-            for (int board = 0; board < Match.BOARD_SIZE; board++) {
-                for (int column = 0; column < Match.BOARD_SIZE; column++) {
+        for (int line = 0; line < MatchInterface.BOARD_SIZE; line++) {
+            for (int board = 0; board < MatchInterface.BOARD_SIZE; board++) {
+                for (int column = 0; column < MatchInterface.BOARD_SIZE; column++) {
                     System.out.print(match.getCell(board, line, column));
                 }
                 System.out.print(' ');
@@ -85,7 +84,6 @@ public class KeyboardController implements Controller {
     }
 
     private void promptInteraction() {
-        int thisPlayer = match.getThisPlayer();
         int currentPlayer = match.getCurrentPlayer();
 
         String options = thisPlayer == currentPlayer ? "um movimento ou mensagem" : "uma mensagem";
@@ -124,46 +122,36 @@ public class KeyboardController implements Controller {
         }
     }
 
-    private void handleUpdate(Command command) {
-        CommandType commandType = command.getType();
+    @Override
+    public void handleInstruction(Instruction instruction) {
+        InstructionType instructionType = instruction.getType();
 
-        switch (commandType) {
-            case MOVE:
-                System.out.println("Controller nao processa movimentos");
+        switch (instructionType) {
+            case SET_GUEST:
+                System.out.println("Você é o jogador " + instruction.getPlayer() + "!");
+                printCells();
+                break;
+            case SET_TURN:
+                int currentPlayer = match.getCurrentPlayer();
+                System.out.println(thisPlayer == currentPlayer ? "Sua vez" : "Aguarde sua vez");
+                promptInteraction();
+                break;
+            case SET_CELL:
+                printCells();
                 promptInteraction();
                 break;
             case MESSAGE:
-                System.out.println("\033[2K\r" + command.getMessage());
+                System.out.println("\033[2K\r" + "[" + instruction.getPlayer() + "] " + instruction.getMessage());
                 promptInteraction();
                 break;
-            case INSTRUCTION:
-                InstructionType instructionType = command.getInstruction().getType();
-
-                switch (instructionType) {
-                    case SET_GUEST:
-                        System.out.println("Você é o jogador " + match.getThisPlayer() + "!");
-                        printCells();
-                        break;
-                    case SET_TURN:
-                        int thisPlayer = match.getThisPlayer();
-                        int currentPlayer = match.getCurrentPlayer();
-                        System.out.println(thisPlayer == currentPlayer ? "Sua vez" : "Aguarde sua vez");
-                        promptInteraction();
-                        break;
-                    case SET_CELL:
-                        printCells();
-                        promptInteraction();
-                        break;
-                    case END_MATCH:
-                        System.out.println("Partida encerrada!");
-                        System.out.println("Vitória do jogador " + match.getCurrentPlayer());
-                        console.close();
-                        return;
-                    default:
-                        break;
-                }
-
+            case END_MATCH:
+                System.out.println("Partida encerrada!");
+                System.out.println("Vitória do jogador " + match.getCurrentPlayer());
+                console.close();
+                return;
+            default:
                 break;
+
         }
     }
 }

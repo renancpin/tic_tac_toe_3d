@@ -6,6 +6,7 @@ public class Instruction {
     private InstructionType type;
     private int player;
     private Move move;
+    private String message;
 
     private Instruction(InstructionType type, int player) {
         this.type = type;
@@ -24,14 +25,8 @@ public class Instruction {
         return this.move;
     }
 
-    public String toString() {
-        String str = this.type + " to player " + this.getPlayer();
-
-        if (this.type == InstructionType.SET_CELL) {
-            str += this.move.toString();
-        }
-
-        return str;
+    public String getMessage() {
+        return this.message;
     }
 
     public static Instruction setGuest(int player) {
@@ -53,6 +48,13 @@ public class Instruction {
     public static Instruction setCell(Move move) {
         Instruction instruction = new Instruction(InstructionType.SET_CELL, move.getPlayer());
         instruction.move = move;
+
+        return instruction;
+    }
+
+    public static Instruction message(String message, int player) {
+        Instruction instruction = new Instruction(InstructionType.MESSAGE, player);
+        instruction.message = message;
 
         return instruction;
     }

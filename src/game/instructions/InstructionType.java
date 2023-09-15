@@ -5,7 +5,8 @@ public enum InstructionType {
     SET_TURN(0),
     SET_GUEST(1),
     END_MATCH(2),
-    SET_CELL(3);
+    SET_CELL(3),
+    MESSAGE(4);
 
     private final int num;
 
@@ -27,6 +28,8 @@ public enum InstructionType {
                 return InstructionType.END_MATCH;
             case (3):
                 return InstructionType.SET_CELL;
+            case (4):
+                return InstructionType.MESSAGE;
         }
 
         return InstructionType.INVALID;

@@ -1,15 +1,12 @@
-import communication.communicator.Communicator;
-import communication.communicator.socket.SocketCommunicator;
-import controllers.Controller;
+import communication.socket.SocketMatchBuilder;
+import controllers.ControllerInterface;
 import controllers.gui.GUIController;
-import game.match.Game;
-import game.match.MatchBuilder;
+import game.match.MatchBuilderInterface;
 
 public class App {
     public static void main(String[] args) throws Exception {
-        Communicator communicator = new SocketCommunicator();
-        MatchBuilder game = new Game(communicator);
-        Controller controller = new GUIController(game);
+        MatchBuilderInterface matchBuilder = new SocketMatchBuilder();
+        ControllerInterface controller = new GUIController(matchBuilder);
 
         controller.start();
     }

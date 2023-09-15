@@ -1,93 +1,86 @@
 package game.match;
 
-import java.util.HashSet;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Random;
-import java.util.Set;
-import java.util.function.Consumer;
+import java.util.Map.Entry;
 
-import communication.command.Command;
-import communication.command.CommandType;
-import communication.communicator.Communicator;
 import game.exceptions.*;
 import game.instructions.*;
 import game.move.*;
 
-public class HostedMatch extends Match implements Runnable {
+public class HostedMatch implements MatchInterface {
     private int[][][] cells = new int[BOARD_SIZE][BOARD_SIZE][BOARD_SIZE];
     private boolean isGameRunning = false;
     private int currentPlayer = 1;
     private int playCount = BOARD_SIZE * BOARD_SIZE * BOARD_SIZE;
-    private final int thisPlayer;
-    private final Communicator communicator;
-    private final Set<Consumer<Command>> consumers = new HashSet<>();
+    private Map<Integer, InstructionConsumerInterface> players = new HashMap<>();
 
-    public HostedMatch(Communicator communicator) {
-        this.thisPlayer = (new Random()).nextInt(1, 3);
-        this.communicator = communicator;
+    public HostedMatch() {
+        currentPlayer = (new Random()).nextInt(1, 3);
     }
 
-    private void notify(Command command) {
-        for (Consumer<Command> consumer : consumers) {
-            consumer.accept(command);
+    private void updateAllExcept(int exceptPlayer, Instruction instruction) {
+        for (Entry<Integer, InstructionConsumerInterface> entry : players.entrySet()) {
+            InstructionConsumerInterface listener = entry.getValue();
+
+            if (exceptPlayer == 0 || entry.getKey() != exceptPlayer) {
+                try {
+                    listener.handleInstruction(instruction);
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+            }
         }
     }
 
+    private void updateAll(Instruction instruction) {
+        updateAllExcept(0, instruction);
+    }
+
+    private int getNextPlayer() {
+        return currentPlayer == PLAYER_LIMIT ? 1 : currentPlayer + 1;
+    }
+
     @Override
-    public void listen(Consumer<Command> listener) {
-        consumers.add(listener);
+    public void join(InstructionConsumerInterface listener) {
+        if (!isGameRunning && players.size() < PLAYER_LIMIT) {
+            int thisPlayer = currentPlayer;
+
+            players.put(thisPlayer, listener);
+
+            currentPlayer = getNextPlayer();
+        }
     }
 
     @Override
     public void start() {
-        Thread thread = new Thread(this);
-        thread.start();
-    }
-
-    @Override
-    public void run() {
-        communicator.host();
-
-        int guest = getNextPlayer(thisPlayer);
-        Command command = new Command(Instruction.setGuest(guest));
-
-        notify(command);
-        communicator.sendCommand(command);
-
-        this.isGameRunning = true;
-
-        while (isGameRunning) {
-            command = communicator.receiveCommand();
-
-            if (command == null) {
-                break;
-            }
-
-            CommandType commandType = command.getType();
-
-            switch (commandType) {
-                case MESSAGE:
-                    String message = command.getMessage();
-                    notify(new Command("[GUEST] " + message));
-                    break;
-                case MOVE:
-                    Move move = command.getMove();
-                    handleMove(move);
-                    break;
-                default:
-                    break;
+        while (players.size() < PLAYER_LIMIT) {
+            try {
+                Thread.sleep(500);
+            } catch (Exception e) {
+                e.printStackTrace();
             }
         }
 
+        for (Entry<Integer, InstructionConsumerInterface> player : players.entrySet()) {
+            InstructionConsumerInterface listener = player.getValue();
+            int id = player.getKey();
+
+            try {
+                listener.handleInstruction(Instruction.setGuest(id));
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
+
+        currentPlayer = 1;
+        isGameRunning = true;
     }
 
     @Override
     public boolean getIsRunning() {
         return this.isGameRunning;
-    }
-
-    @Override
-    public int getThisPlayer() {
-        return this.thisPlayer;
     }
 
     @Override
@@ -101,18 +94,18 @@ public class HostedMatch extends Match implements Runnable {
     }
 
     @Override
-    public void handleMessage(String message) {
-        Command command = new Command(message);
+    public void sendMessage(String message, int player) {
+        Instruction instruction = Instruction.message(message, player);
 
-        communicator.sendCommand(command);
+        updateAllExcept(player, instruction);
     }
 
     @Override
-    public void handleMove(Move move) {
+    public void sendMove(Move move) {
         try {
             assertLegalMove(move);
         } catch (InvalidMoveException exception) {
-            handleMessage("[ERROR] " + exception.toString());
+            sendMessage("[ERROR] " + exception.toString(), 0);
             return;
         }
 
@@ -193,33 +186,22 @@ public class HostedMatch extends Match implements Runnable {
 
         playCount--;
 
-        Instruction instruction = Instruction.setCell(move);
-
-        Command command = new Command(instruction);
-
-        notify(command);
-        communicator.sendCommand(command);
+        updateAll(Instruction.setCell(move));
     }
 
     private void endTurn() {
-        currentPlayer = getNextPlayer(currentPlayer);
-        final Instruction instruction = Instruction.setTurn(currentPlayer);
+        currentPlayer = getNextPlayer();
 
-        Command command = new Command(instruction);
-
-        notify(command);
-        communicator.sendCommand(command);
+        updateAll(Instruction.setTurn(currentPlayer));
     }
 
     private void endMatch() {
         isGameRunning = false;
 
-        final Instruction instruction = Instruction.endMatch(currentPlayer);
+        int winner = currentPlayer;
+        currentPlayer = 0;
 
-        Command command = new Command(instruction);
-
-        notify(command);
-        communicator.sendCommand(command);
+        updateAll(Instruction.endMatch(winner));
     }
 
     private boolean checkWinConditionStraightLines(Move move) {

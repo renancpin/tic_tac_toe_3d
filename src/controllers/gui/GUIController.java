@@ -14,12 +14,11 @@ import java.awt.Color;
 import javax.swing.JButton;
 import javax.swing.JTextPane;
 import java.awt.Font;
-import communication.command.Command;
-import communication.command.CommandType;
-import controllers.Controller;
+import controllers.ControllerInterface;
+import game.instructions.Instruction;
 import game.instructions.InstructionType;
-import game.match.Match;
-import game.match.MatchBuilder;
+import game.match.MatchInterface;
+import game.match.MatchBuilderInterface;
 import game.move.Move;
 
 import javax.swing.JScrollPane;
@@ -30,20 +29,21 @@ import java.awt.event.ActionListener;
 import java.util.HashSet;
 import java.util.Set;
 
-public class GUIController implements Controller {
-	private int BOARD_SIZE = Match.BOARD_SIZE;
+public class GUIController implements ControllerInterface {
+	private int BOARD_SIZE = MatchInterface.BOARD_SIZE;
 	private JFrame frame;
 	private JTextField textField;
 	private JTextPane chatBox;
 	private JButton[][][] cells = new JButton[BOARD_SIZE][BOARD_SIZE][BOARD_SIZE];
 	private Set<JButton> allButtons = new HashSet<>();
-	private MatchBuilder matchBuilder;
-	private Match match;
+	private MatchBuilderInterface matchBuilder;
+	private MatchInterface match;
+	private int thisPlayer;
 
 	/**
 	 * Create the application.
 	 */
-	public GUIController(MatchBuilder matchBuilder) {
+	public GUIController(MatchBuilderInterface matchBuilder) {
 		this.matchBuilder = matchBuilder;
 	}
 
@@ -133,8 +133,8 @@ public class GUIController implements Controller {
 							int board = Character.getNumericValue(command.charAt(0));
 							int line = Character.getNumericValue(command.charAt(1));
 							int column = Character.getNumericValue(command.charAt(2));
-							Move move = new Move(match.getThisPlayer(), board, line, column);
-							match.handleMove(move);
+							Move move = new Move(thisPlayer, board, line, column);
+							match.sendMove(move);
 						}
 					});
 				}
@@ -158,8 +158,8 @@ public class GUIController implements Controller {
 			public void actionPerformed(ActionEvent e) {
 				String message = textField.getText();
 				if (!message.equals("")) {
-					match.handleMessage(message);
-					addText(message);
+					match.sendMessage(message, thisPlayer);
+					addText("[VOCE] " + message);
 					textField.setText("");
 				}
 			}
@@ -172,8 +172,8 @@ public class GUIController implements Controller {
 		btnSurrender.setBounds(621, 10, 89, 26);
 		btnSurrender.addActionListener(new ActionListener() {
 			public void actionPerformed(ActionEvent e) {
-				Move move = Move.Surrender(match.getThisPlayer());
-				match.handleMove(move);
+				Move move = Move.Surrender(thisPlayer);
+				match.sendMove(move);
 			}
 		});
 		panelControls.add(btnSurrender);
@@ -207,7 +207,7 @@ public class GUIController implements Controller {
 			@Override
 			public Void doInBackground() {
 				match = matchBuilder.createMatch(asHost);
-				match.listen(controller::handleUpdate);
+				match.join(controller);
 				match.start();
 				while (!match.getIsRunning()) {
 					try {
@@ -216,6 +216,7 @@ public class GUIController implements Controller {
 						e.printStackTrace();
 					}
 				}
+				toggleTurn();
 				controller.addText("Partida iniciada");
 				return null;
 			}
@@ -228,51 +229,45 @@ public class GUIController implements Controller {
 	}
 
 	private void toggleTurn() {
-		boolean isMyTurn = match.getCurrentPlayer() == match.getThisPlayer();
+		boolean isMyTurn = match.getCurrentPlayer() == thisPlayer;
 		for (JButton button : allButtons) {
 			button.setEnabled(isMyTurn);
 		}
 	}
 
-	private void handleUpdate(Command command) {
-		CommandType commandType = command.getType();
+	@Override
+	public void handleInstruction(Instruction instruction) {
+		InstructionType instructionType = instruction.getType();
+		int player = instruction.getPlayer();
 
-		switch (commandType) {
-			case MOVE:
-				addText("Controller nao processa movimentos");
-				break;
+		switch (instructionType) {
 			case MESSAGE:
-				addText("[YOU] " + command.getMessage());
+				String message = instruction.getMessage();
+				String tag = player != 0 ? "[Player " + player + "]" : "[SERVER]";
+				addText(tag + " " + message);
 				break;
-			case INSTRUCTION:
-				InstructionType instructionType = command.getInstruction().getType();
+			case SET_GUEST:
+				thisPlayer = instruction.getPlayer();
+				addText("Você é o jogador " + thisPlayer + "!");
+				break;
+			case SET_TURN:
+				toggleTurn();
+				break;
+			case SET_CELL:
+				Move move = instruction.getMove();
 
-				switch (instructionType) {
-					case SET_GUEST:
-						int thisPlayer = match.getThisPlayer();
-						addText("Você é o jogador " + thisPlayer + "!");
-						toggleTurn();
-						break;
-					case SET_TURN:
-						toggleTurn();
-						break;
-					case SET_CELL:
-						Move move = command.getInstruction().getMove();
+				int board = move.getBoard();
+				int line = move.getLine();
+				int column = move.getColumn();
 
-						int player = move.getPlayer();
-						int board = move.getBoard();
-						int line = move.getLine();
-						int column = move.getColumn();
-
-						cells[board][line][column].setText(player == 1 ? "X" : "O");
-						break;
-					case END_MATCH:
-						addText("Partida encerrada!");
-						addText("Vitória do jogador " + match.getCurrentPlayer());
-						return;
-					default:
-						break;
-				}
+				cells[board][line][column].setText(player == 1 ? "X" : "O");
+				break;
+			case END_MATCH:
+				addText("Partida encerrada!");
+				addText("Vitória do jogador " + instruction.getPlayer());
+				toggleTurn();
+				return;
+			default:
 				break;
 		}
 	}
