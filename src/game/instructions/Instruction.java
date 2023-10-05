@@ -1,8 +1,10 @@
 package game.instructions;
 
+import java.io.Serializable;
+
 import game.move.Move;
 
-public class Instruction {
+public class Instruction implements Serializable {
     private InstructionType type;
     private int player;
     private Move move;

@@ -1,6 +1,8 @@
 package game.move;
 
-public class Move {
+import java.io.Serializable;
+
+public class Move implements Serializable {
     private int board = -1;
     private int line = -1;
     private int column = -1;
