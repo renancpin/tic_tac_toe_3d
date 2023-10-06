@@ -147,14 +147,10 @@ public class GUIController implements ControllerInterface {
 
 		textField = new JTextField();
 		textField.setBounds(23, 171, 556, 26);
-		panelControls.add(textField);
 		textField.setColumns(10);
+		panelControls.add(textField);
 
-		JButton btnSendMessage = new JButton("Enviar");
-		btnSendMessage.setFont(new Font("Tahoma", Font.BOLD, 10));
-		btnSendMessage.setForeground(new Color(0, 128, 0));
-		btnSendMessage.setBounds(621, 171, 89, 25);
-		btnSendMessage.addActionListener(new ActionListener() {
+		ActionListener actionSendMessage = new ActionListener() {
 			public void actionPerformed(ActionEvent e) {
 				String message = textField.getText();
 				if (!message.equals("")) {
@@ -163,7 +159,15 @@ public class GUIController implements ControllerInterface {
 					textField.setText("");
 				}
 			}
-		});
+		};
+
+		textField.addActionListener(actionSendMessage);
+
+		JButton btnSendMessage = new JButton("Enviar");
+		btnSendMessage.setFont(new Font("Tahoma", Font.BOLD, 10));
+		btnSendMessage.setForeground(new Color(0, 128, 0));
+		btnSendMessage.setBounds(621, 171, 89, 25);
+		btnSendMessage.addActionListener(actionSendMessage);
 		panelControls.add(btnSendMessage);
 
 		JButton btnSurrender = new JButton("Desistir");
